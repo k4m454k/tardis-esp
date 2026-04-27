@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TARDIS ESP LED</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101318;
+      --panel: #191f27;
+      --panel-2: #202832;
+      --text: #edf2f7;
+      --muted: #9aa8b8;
+      --line: #2d3846;
+      --accent: #42d392;
+      --danger: #ff6b6b;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(66, 211, 146, .16), transparent 34rem),
+        linear-gradient(140deg, #101318, #151a21 56%, #11151b);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(960px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(2rem, 6vw, 4.5rem);
+      line-height: .95;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(25, 31, 39, .8);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+
+    .status-pill.online .status-dot {
+      background: var(--accent);
+      box-shadow: 0 0 16px rgba(66, 211, 146, .7);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(25, 31, 39, .86);
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      padding: 18px;
+    }
+
+    .preview {
+      display: grid;
+      place-items: center;
+      min-height: 220px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, .04), transparent),
+        var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .led {
+      width: min(46vw, 220px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #ff0000;
+      box-shadow:
+        inset 0 0 36px rgba(255, 255, 255, .24),
+        0 0 80px rgba(255, 0, 0, .42);
+      transition: background-color .16s ease, box-shadow .16s ease, opacity .16s ease;
+    }
+
+    .led.off {
+      opacity: .22;
+      box-shadow: inset 0 0 28px rgba(255, 255, 255, .12);
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin: 14px 0;
+    }
+
+    .field > button {
+      width: 100%;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    input[type="color"],
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+    }
+
+    input[type="color"] {
+      height: 56px;
+    }
+
+    input[type="text"] {
+      min-height: 44px;
+      padding: 8px 10px;
+    }
+
+    textarea {
+      min-height: 190px;
+      padding: 10px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .85rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    button {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel-2);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: rgba(66, 211, 146, .45);
+      background: #1f5f49;
+    }
+
+    button.danger {
+      border-color: rgba(255, 107, 107, .45);
+      background: #623038;
+    }
+
+    button.active {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .65;
+    }
+
+    .zone-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .zone-tab {
+      text-transform: capitalize;
+    }
+
+    .zone-tab.selected {
+      border-color: rgba(66, 211, 146, .55);
+      background: #1f5f49;
+    }
+
+    .zone-tab.disabled-zone {
+      color: var(--muted);
+      background: #161b22;
+    }
+
+    .disabled-note {
+      display: none;
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 230, 0, .22);
+      border-radius: 8px;
+      color: #ffe7a3;
+      background: rgba(255, 180, 0, .08);
+    }
+
+    .disabled-note.visible {
+      display: block;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .swatch {
+      min-height: 36px;
+      border-color: rgba(255, 255, 255, .18);
+    }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    .side {
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .stats {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .stat:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .stat span:first-child {
+      color: var(--muted);
+    }
+
+    .json {
+      min-height: 150px;
+      margin: 0;
+      padding: 12px;
+      overflow: auto;
+      border-radius: 8px;
+      background: #0c0f13;
+      color: #c8d6e5;
+      font-size: .82rem;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 18px;
+      }
+
+      header,
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .status-pill {
+        justify-self: start;
+      }
+
+      .button-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>TARDIS ESP</h1>
+        <p class="subtitle">TARDIS light zones</p>
+      </div>
+      <div id="connection" class="status-pill">
+        <span class="status-dot"></span>
+        <span id="connectionText">Connecting</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="controls">
+        <div class="zone-tabs" id="zoneTabs">
+          <button class="zone-tab" type="button" data-zone="lamp">Lamp</button>
+          <button class="zone-tab disabled-zone" type="button" data-zone="windows">Windows</button>
+          <button class="zone-tab disabled-zone" type="button" data-zone="signs">Signs</button>
+        </div>
+
+        <p id="disabledNote" class="disabled-note">This zone is disabled until the LEDs are wired.</p>
+
+        <div class="preview">
+          <div id="ledPreview" class="led"></div>
+        </div>
+
+        <div class="field">
+          <label for="color">Color</label>
+          <input id="color" type="color" value="#ff0000">
+          <div class="presets" id="presets"></div>
+        </div>
+
+        <div class="field">
+          <label for="speed">Speed / period: <span id="speedValue">500 ms</span></label>
+          <input id="speed" type="range" min="80" max="3000" step="20" value="500">
+        </div>
+
+        <div class="button-grid">
+          <button class="primary" data-action="on">On</button>
+          <button class="danger" data-action="off">Off</button>
+          <button data-action="color">Set color</button>
+          <button data-action="blink">Blink</button>
+          <button data-action="pulse">Pulse</button>
+          <button data-action="flash">Flash</button>
+          <button data-action="heartbeat">Heartbeat</button>
+          <button data-action="double">Double</button>
+          <button data-action="triple">Triple</button>
+          <button data-action="sos">SOS</button>
+          <button data-action="breathe">Breathe</button>
+          <button data-action="flicker">Flicker</button>
+          <button data-action="glitch">Glitch</button>
+          <button data-action="alarm">Alarm</button>
+          <button data-action="notify">Notify</button>
+          <button data-action="rainbow">Rainbow</button>
+          <button data-action="refresh">Refresh</button>
+        </div>
+
+        <div class="field">
+          <label for="customPattern">Pattern string</label>
+          <input id="customPattern" type="text" value="1:120,0:120,1:120,0:800">
+          <button class="wide" data-action="customString">Run string</button>
+        </div>
+
+        <div class="field">
+          <label for="customJson">Pattern JSON</label>
+          <textarea id="customJson">{
+  "name": "custom",
+  "repeat": true,
+  "steps": [
+    { "color": "#ff0000", "ms": 100 },
+    { "color": "#000000", "ms": 100 },
+    { "color": "#ff0000", "ms": 100 },
+    { "color": "#000000", "ms": 800 }
+  ]
+}</textarea>
+          <button class="wide" data-action="customJson">Run JSON</button>
+        </div>
+      </section>
+
+      <div class="side">
+        <section class="panel">
+          <h2>Status</h2>
+          <div class="stats">
+            <div class="stat"><span>Mode</span><strong id="mode">-</strong></div>
+            <div class="stat"><span>Pattern</span><strong id="pattern">-</strong></div>
+            <div class="stat"><span>Color</span><strong id="colorText">-</strong></div>
+            <div class="stat"><span>Steps</span><strong id="stepCount">-</strong></div>
+            <div class="stat"><span>Button</span><strong id="buttonState">-</strong></div>
+            <div class="stat"><span>Aux LED</span><strong id="auxState">-</strong></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>API response</h2>
+          <pre id="rawState" class="json">{}</pre>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const ui = {
+      color: document.getElementById('color'),
+      speed: document.getElementById('speed'),
+      speedValue: document.getElementById('speedValue'),
+      ledPreview: document.getElementById('ledPreview'),
+      connection: document.getElementById('connection'),
+      connectionText: document.getElementById('connectionText'),
+      mode: document.getElementById('mode'),
+      pattern: document.getElementById('pattern'),
+      colorText: document.getElementById('colorText'),
+      stepCount: document.getElementById('stepCount'),
+      buttonState: document.getElementById('buttonState'),
+      auxState: document.getElementById('auxState'),
+      rawState: document.getElementById('rawState'),
+      actionButtons: Array.from(document.querySelectorAll('button[data-action]')),
+      zoneTabs: Array.from(document.querySelectorAll('button[data-zone]')),
+      disabledNote: document.getElementById('disabledNote'),
+      presets: document.getElementById('presets'),
+      customPattern: document.getElementById('customPattern'),
+      customJson: document.getElementById('customJson')
+    };
+
+    const presets = ['#ff0000', '#ff7a00', '#ffe600', '#00d26a', '#00a3ff', '#9b5cff'];
+    const namedPatterns = ['flash', 'heartbeat', 'double', 'triple', 'sos', 'breathe', 'flicker', 'glitch', 'alarm', 'notify', 'rainbow'];
+    const autoRefreshMs = 15000;
+    let selectedZone = 'lamp';
+    let zones = {};
+    let zoneOrder = ['lamp', 'windows', 'signs'];
+    let buttonPressed = false;
+    let auxLedReady = false;
+    let isEditingColor = false;
+    let isEditingCustom = false;
+    let isRequestBusy = false;
+
+    function currentZone() {
+      return zones[selectedZone] || null;
+    }
+
+    function zoneBase() {
+      return `/api/zones/${selectedZone}`;
+    }
+
+    function hex() {
+      return ui.color.value.slice(1);
+    }
+
+    function colorFromState(state) {
+      const r = state.color.r.toString(16).padStart(2, '0');
+      const g = state.color.g.toString(16).padStart(2, '0');
+      const b = state.color.b.toString(16).padStart(2, '0');
+      return `#${r}${g}${b}`;
+    }
+
+    function selectedZoneEnabled() {
+      const state = currentZone();
+      return Boolean(state && state.enabled && state.ready);
+    }
+
+    function setControlsAvailability() {
+      const enabled = selectedZoneEnabled();
+
+      ui.actionButtons.forEach((button) => {
+        button.disabled = isRequestBusy || (!enabled && button.dataset.action !== 'refresh');
+      });
+
+      [ui.color, ui.speed, ui.customPattern, ui.customJson].forEach((control) => {
+        control.disabled = isRequestBusy || !enabled;
+      });
+
+      Array.from(ui.presets.querySelectorAll('button')).forEach((button) => {
+        button.disabled = isRequestBusy || !enabled;
+      });
+
+      ui.disabledNote.classList.toggle('visible', !enabled);
+    }
+
+    function setBusy(isBusy) {
+      isRequestBusy = isBusy;
+      setControlsAvailability();
+    }
+
+    function setOnline(isOnline) {
+      ui.connection.classList.toggle('online', isOnline);
+      ui.connectionText.textContent = isOnline ? 'Online' : 'Offline';
+    }
+
+    function renderZoneTabs() {
+      ui.zoneTabs.forEach((button) => {
+        const state = zones[button.dataset.zone];
+        button.classList.toggle('selected', button.dataset.zone === selectedZone);
+        button.classList.toggle('disabled-zone', !state || !state.enabled);
+      });
+    }
+
+    function renderState(state) {
+      const color = colorFromState(state);
+      const previewColor = isEditingColor ? ui.color.value : color;
+
+      if (!isEditingColor) {
+        ui.color.value = color;
+      }
+
+      ui.ledPreview.style.backgroundColor = previewColor;
+      ui.ledPreview.style.boxShadow = `inset 0 0 36px rgba(255,255,255,.24), 0 0 80px ${previewColor}88`;
+      ui.ledPreview.classList.toggle('off', !state.is_on);
+      ui.mode.textContent = state.mode;
+      ui.pattern.textContent = state.pattern;
+      ui.colorText.textContent = color.toUpperCase();
+      ui.stepCount.textContent = String(state.step_count || 0);
+      ui.buttonState.textContent = buttonPressed ? 'Pressed' : 'Released';
+      ui.auxState.textContent = auxLedReady ? 'Ready' : 'Unavailable';
+
+      ui.actionButtons.forEach((button) => {
+        const action = button.dataset.action;
+        const isActive = state.enabled && (action === state.mode || action === state.pattern || (state.mode === 'custom' && action === 'customJson'));
+        button.classList.toggle('active', isActive);
+      });
+
+      setControlsAvailability();
+    }
+
+    function renderSelectedZone() {
+      renderZoneTabs();
+      const state = currentZone();
+
+      if (!state) {
+        ui.rawState.textContent = `Unknown zone: ${selectedZone}`;
+        setControlsAvailability();
+        return;
+      }
+
+      renderState(state);
+      ui.rawState.textContent = JSON.stringify(state, null, 2);
+    }
+
+    function renderAggregate(data) {
+      zones = data.zones || {};
+      zoneOrder = data.zone_order || zoneOrder;
+      buttonPressed = Boolean(data.button_pressed);
+      auxLedReady = Boolean(data.aux_led_ready);
+
+      if (!zones[selectedZone]) {
+        selectedZone = zoneOrder[0] || 'lamp';
+      }
+
+      renderSelectedZone();
+    }
+
+    function handleApiResult(data) {
+      if (data.zones) {
+        renderAggregate(data);
+        return;
+      }
+
+      if (data.zone) {
+        zones[data.zone] = data;
+        selectedZone = data.zone;
+        renderSelectedZone();
+        return;
+      }
+
+      ui.rawState.textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function call(path, options = {}) {
+      setBusy(true);
+      try {
+        const response = await fetch(path, options);
+        const data = await response.json();
+        setOnline(true);
+
+        if (!response.ok) {
+          ui.rawState.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        handleApiResult(data);
+      } catch (error) {
+        setOnline(false);
+        ui.rawState.textContent = error.message;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function refreshState() {
+      if (isRequestBusy || isEditingColor || isEditingCustom) {
+        return;
+      }
+      call('/api/zones');
+    }
+
+    function pathForAction(action) {
+      const ms = ui.speed.value;
+      const color = hex();
+
+      if (action === 'on') return `${zoneBase()}/on?hex=${color}`;
+      if (action === 'off') return `${zoneBase()}/off`;
+      if (action === 'color') return `${zoneBase()}/color?hex=${color}`;
+      if (action === 'blink') return `${zoneBase()}/blink?hex=${color}&interval=${ms}`;
+      if (action === 'pulse') return `${zoneBase()}/pulse?hex=${color}&period=${ms}`;
+      if (action === 'customString') {
+        return `${zoneBase()}/custom?hex=${color}&unit=${ms}&repeat=1&pattern=${encodeURIComponent(ui.customPattern.value)}`;
+      }
+
+      if (namedPatterns.includes(action)) {
+        return `${zoneBase()}/pattern?name=${action}&hex=${color}&interval=${ms}`;
+      }
+
+      return '/api/zones';
+    }
+
+    function buildPresets() {
+      presets.forEach((color) => {
+        const button = document.createElement('button');
+        button.className = 'swatch';
+        button.style.background = color;
+        button.title = color.toUpperCase();
+        button.type = 'button';
+        button.addEventListener('click', () => {
+          if (!selectedZoneEnabled()) return;
+          ui.color.value = color;
+          call(`${zoneBase()}/color?hex=${hex()}`);
+        });
+        ui.presets.appendChild(button);
+      });
+    }
+
+    ui.zoneTabs.forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedZone = button.dataset.zone;
+        isEditingColor = false;
+        renderSelectedZone();
+      });
+    });
+
+    ui.actionButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        isEditingColor = false;
+        if (button.dataset.action === 'customJson') {
+          call(`${zoneBase()}/custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: ui.customJson.value
+          });
+          return;
+        }
+
+        call(pathForAction(button.dataset.action));
+      });
+    });
+
+    ui.color.addEventListener('input', () => {
+      isEditingColor = true;
+      ui.ledPreview.style.backgroundColor = ui.color.value;
+    });
+
+    ui.color.addEventListener('change', () => {
+      isEditingColor = false;
+    });
+
+    ui.customPattern.addEventListener('focus', () => {
+      isEditingCustom = true;
+    });
+
+    ui.customJson.addEventListener('focus', () => {
+      isEditingCustom = true;
+    });
+
+    ui.customPattern.addEventListener('blur', () => {
+      isEditingCustom = false;
+    });
+
+    ui.customJson.addEventListener('blur', () => {
+      isEditingCustom = false;
+    });
+
+    ui.speed.addEventListener('input', () => {
+      ui.speedValue.textContent = `${ui.speed.value} ms`;
+    });
+
+    buildPresets();
+    ui.speedValue.textContent = `${ui.speed.value} ms`;
+    call('/api/zones');
+    setInterval(refreshState, autoRefreshMs);
+  </script>
+</body>
+</html>

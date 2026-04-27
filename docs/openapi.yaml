@@ -1,0 +1,559 @@
+openapi: 3.0.3
+info:
+  title: TARDIS ESP Light Zones API
+  version: "2.0.0"
+  description: Zone-only HTTP API for controlling TARDIS model light zones.
+servers:
+  - url: http://tardis-esp.local
+    description: mDNS hostname
+  - url: http://{host}
+    description: Direct IP address
+    variables:
+      host:
+        default: 192.168.1.100
+paths:
+  /:
+    get:
+      summary: Web UI
+      responses:
+        "200":
+          description: HTML web interface
+          content:
+            text/html:
+              schema:
+                type: string
+        "500":
+          $ref: "#/components/responses/TextError"
+  /api/zones:
+    get:
+      summary: List configured zones
+      responses:
+        "200":
+          description: All configured zones and shared hardware state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZonesResponse"
+  /api/zones/{zone}/state:
+    get:
+      summary: Read one zone state
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/off:
+    get:
+      summary: Turn an enabled zone off
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/on:
+    get:
+      summary: Turn an enabled zone on with solid color
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/color:
+    get:
+      summary: Set solid color for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/blink:
+    get:
+      summary: Start blink mode for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+        - name: interval
+          in: query
+          description: On and off duration in milliseconds.
+          schema:
+            type: integer
+            minimum: 50
+            maximum: 10000
+            default: 500
+        - name: interval_ms
+          in: query
+          description: Alias for interval.
+          schema:
+            type: integer
+            minimum: 50
+            maximum: 10000
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/pulse:
+    get:
+      summary: Start pulse mode for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+        - name: period
+          in: query
+          description: Pulse period in milliseconds.
+          schema:
+            type: integer
+            minimum: 300
+            maximum: 10000
+            default: 1500
+        - name: period_ms
+          in: query
+          description: Alias for period.
+          schema:
+            type: integer
+            minimum: 300
+            maximum: 10000
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/pattern:
+    get:
+      summary: Start built-in named pattern for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - name: name
+          in: query
+          description: Built-in pattern name.
+          schema:
+            type: string
+            default: flash
+            enum:
+              - flash
+              - heartbeat
+              - double
+              - triple
+              - sos
+              - breathe
+              - flicker
+              - glitch
+              - alarm
+              - notify
+              - rainbow
+              - wifi
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+        - name: interval
+          in: query
+          description: Speed value for patterns that support it.
+          schema:
+            type: integer
+            minimum: 20
+            maximum: 10000
+            default: 500
+        - name: period
+          in: query
+          description: Alias for interval.
+          schema:
+            type: integer
+            minimum: 20
+            maximum: 10000
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+  /api/zones/{zone}/custom:
+    get:
+      summary: Start custom pattern from compact string for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+        - name: pattern
+          in: query
+          required: true
+          description: Binary string such as 100101110 or timed tokens such as 1:120,0:120,1:120,0:800.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Hex"
+        - $ref: "#/components/parameters/R"
+        - $ref: "#/components/parameters/G"
+        - $ref: "#/components/parameters/B"
+        - name: unit
+          in: query
+          description: Duration in milliseconds for binary pattern characters.
+          schema:
+            type: integer
+            minimum: 20
+            maximum: 10000
+            default: 150
+        - name: interval
+          in: query
+          description: Alias for unit.
+          schema:
+            type: integer
+            minimum: 20
+            maximum: 10000
+        - name: repeat
+          in: query
+          description: Whether the pattern repeats. Firmware also accepts 1/0, yes/no, on/off.
+          schema:
+            type: boolean
+            default: true
+        - name: name
+          in: query
+          description: Name stored in the zone state.
+          schema:
+            type: string
+            default: custom
+            maxLength: 24
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+    post:
+      summary: Start custom pattern from JSON for an enabled zone
+      parameters:
+        - $ref: "#/components/parameters/Zone"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomPatternRequest"
+            examples:
+              doubleFlash:
+                summary: Double red flash
+                value:
+                  name: custom
+                  repeat: true
+                  steps:
+                    - color: "#ff0000"
+                      ms: 100
+                    - color: "#000000"
+                      ms: 100
+                    - color: "#ff0000"
+                      ms: 100
+                    - color: "#000000"
+                      ms: 800
+              softFade:
+                summary: Soft blue fade
+                value:
+                  name: soft-blue
+                  repeat: true
+                  steps:
+                    - color: "#001133"
+                      ms: 400
+                      fade: true
+                    - color: "#00a3ff"
+                      ms: 900
+                      fade: true
+                    - color: "#000000"
+                      ms: 700
+                      fade: true
+      responses:
+        "200":
+          $ref: "#/components/responses/ZoneState"
+        "400":
+          $ref: "#/components/responses/JsonError"
+        "404":
+          $ref: "#/components/responses/JsonError"
+components:
+  parameters:
+    Zone:
+      name: zone
+      in: path
+      required: true
+      description: Light zone slug.
+      schema:
+        type: string
+        enum:
+          - lamp
+          - windows
+          - signs
+    Hex:
+      name: hex
+      in: query
+      description: RGB color in rrggbb form. Firmware also accepts a leading # when URL-encoded.
+      schema:
+        type: string
+        pattern: "^#?[0-9a-fA-F]{6}$"
+        example: ff0000
+    R:
+      name: r
+      in: query
+      description: Red channel.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 255
+    G:
+      name: g
+      in: query
+      description: Green channel.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 255
+    B:
+      name: b
+      in: query
+      description: Blue channel.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 255
+  responses:
+    ZoneState:
+      description: Current zone state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ZoneState"
+    JsonError:
+      description: JSON error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TextError:
+      description: Plain text error response
+      content:
+        text/plain:
+          schema:
+            type: string
+  schemas:
+    ZonesResponse:
+      type: object
+      required:
+        - zones
+        - zone_order
+        - button_pressed
+        - aux_led_ready
+      properties:
+        zones:
+          type: object
+          required:
+            - lamp
+            - windows
+            - signs
+          properties:
+            lamp:
+              $ref: "#/components/schemas/ZoneState"
+            windows:
+              $ref: "#/components/schemas/ZoneState"
+            signs:
+              $ref: "#/components/schemas/ZoneState"
+        zone_order:
+          type: array
+          items:
+            type: string
+            enum:
+              - lamp
+              - windows
+              - signs
+          example:
+            - lamp
+            - windows
+            - signs
+        button_pressed:
+          type: boolean
+        aux_led_ready:
+          type: boolean
+    ZoneState:
+      type: object
+      required:
+        - zone
+        - label
+        - enabled
+        - ready
+        - draft
+        - pin
+        - pixel_count
+        - mode
+        - pattern
+        - color
+        - interval_ms
+        - repeat
+        - step_count
+        - is_on
+      properties:
+        zone:
+          type: string
+          enum:
+            - lamp
+            - windows
+            - signs
+        label:
+          type: string
+          example: Top lamp
+        enabled:
+          type: boolean
+        ready:
+          type: boolean
+        draft:
+          type: boolean
+        pin:
+          nullable: true
+          type: integer
+          example: 10
+        pixel_count:
+          type: integer
+          example: 1
+        mode:
+          type: string
+          enum:
+            - "off"
+            - solid
+            - blink
+            - pulse
+            - pattern
+            - custom
+            - disabled
+        pattern:
+          type: string
+          example: heartbeat
+        color:
+          $ref: "#/components/schemas/ColorObject"
+        interval_ms:
+          type: integer
+          example: 500
+        repeat:
+          type: boolean
+        step_count:
+          type: integer
+          example: 0
+        is_on:
+          type: boolean
+    ColorObject:
+      type: object
+      required:
+        - r
+        - g
+        - b
+      properties:
+        r:
+          type: integer
+          minimum: 0
+          maximum: 255
+        g:
+          type: integer
+          minimum: 0
+          maximum: 255
+        b:
+          type: integer
+          minimum: 0
+          maximum: 255
+    CustomPatternRequest:
+      type: object
+      required:
+        - steps
+      properties:
+        name:
+          type: string
+          maxLength: 24
+          default: custom
+        repeat:
+          type: boolean
+          default: true
+        color:
+          description: Base color used by steps that only specify on=true.
+          oneOf:
+            - type: string
+              pattern: "^#?[0-9a-fA-F]{6}$"
+            - type: array
+              minItems: 3
+              maxItems: 3
+              items:
+                type: integer
+                minimum: 0
+                maximum: 255
+            - $ref: "#/components/schemas/ColorObject"
+        hex:
+          type: string
+          pattern: "^#?[0-9a-fA-F]{6}$"
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/PatternStep"
+    PatternStep:
+      type: object
+      properties:
+        color:
+          oneOf:
+            - type: string
+              pattern: "^#?[0-9a-fA-F]{6}$"
+            - type: array
+              minItems: 3
+              maxItems: 3
+              items:
+                type: integer
+                minimum: 0
+                maximum: 255
+            - $ref: "#/components/schemas/ColorObject"
+        hex:
+          type: string
+          pattern: "^#?[0-9a-fA-F]{6}$"
+        "on":
+          type: boolean
+        ms:
+          type: integer
+          minimum: 20
+          maximum: 10000
+          default: 100
+        duration:
+          type: integer
+          minimum: 20
+          maximum: 10000
+        fade:
+          type: boolean
+          default: false
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Zone is disabled
