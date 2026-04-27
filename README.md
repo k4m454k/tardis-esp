@@ -8,9 +8,9 @@ The project runs on an ESP32-C3 and controls SK6812/NeoPixel RGB light zones thr
 
 ![Illuminated TARDIS model](media/photos/tardis-hero.jpg)
 
-[![Watch the demo video](media/screenshots/demo-video-poster.jpg)](media/demo/tardis-demo-720p.mp4)
+![TARDIS demo animation](media/demo/tardis-demo-preview.gif)
 
-[Watch demo video (MP4, no audio)](media/demo/tardis-demo-720p.mp4)
+[Watch full demo video (MP4, no audio)](media/demo/tardis-demo-720p.mp4)
 
 ## Components
 
