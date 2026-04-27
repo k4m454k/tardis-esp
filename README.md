@@ -128,6 +128,8 @@ The UI supports:
 - custom JSON patterns;
 - live state display.
 
+![TARDIS ESP web interface](media/screenshots/web-interface.jpg)
+
 ## API Overview
 
 The API is zone-only. Use `/api/zones/{zone}/...`, where `{zone}` is one of:
