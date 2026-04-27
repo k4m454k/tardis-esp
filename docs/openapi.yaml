@@ -34,6 +34,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ZonesResponse"
+  /api/system:
+    get:
+      summary: Read heap and HTTP maintenance diagnostics
+      responses:
+        "200":
+          description: System diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemResponse"
   /api/zones/{zone}/state:
     get:
       summary: Read one zone state
@@ -399,6 +409,38 @@ components:
           type: boolean
         aux_led_ready:
           type: boolean
+    SystemResponse:
+      type: object
+      required:
+        - memory
+        - gc
+      properties:
+        memory:
+          type: object
+          required:
+            - free
+            - allocated
+          properties:
+            free:
+              type: integer
+              nullable: true
+              description: Free heap bytes reported by MicroPython.
+            allocated:
+              type: integer
+              nullable: true
+              description: Allocated heap bytes reported by MicroPython.
+        gc:
+          type: object
+          required:
+            - file_chunk_bytes
+            - maintenance_seconds
+          properties:
+            file_chunk_bytes:
+              type: integer
+              example: 1024
+            maintenance_seconds:
+              type: integer
+              example: 60
     ZoneState:
       type: object
       required:

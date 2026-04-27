@@ -1,4 +1,6 @@
 import uasyncio as asyncio
+import gc
+import os
 import ujson
 
 from config import HTTP_HOST, HTTP_PORT, MAX_BODY_BYTES
@@ -15,17 +17,23 @@ from patterns import custom_steps_from_json, steps_from_text
 from utils import parse_bool, parse_color, parse_int, parse_query
 
 
-def response(status, content_type, body):
-    if isinstance(body, str):
-        body = body.encode()
+FILE_CHUNK_BYTES = 1024
+GC_MAINTENANCE_SECONDS = 60
+CONNECTION_ERROR_CODES = (32, 104, 113, 128)
+INTERNAL_ERROR_BODY = b'{"error":"Internal server error"}'
+MEMORY_ERROR_BODY = b'{"error":"Memory allocation failed"}'
 
-    reason = {
+
+def status_reason(status):
+    return {
         200: "OK",
         400: "Bad Request",
         404: "Not Found",
         500: "Internal Server Error",
     }.get(status, "OK")
 
+
+def response_headers(status, content_type, content_length):
     return (
         "HTTP/1.1 {} {}\r\n"
         "Content-Type: {}\r\n"
@@ -35,7 +43,14 @@ def response(status, content_type, body):
         "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
         "Access-Control-Allow-Headers: Content-Type\r\n"
         "\r\n"
-    ).format(status, reason, content_type, len(body)).encode() + body
+    ).format(status, status_reason(status), content_type, content_length).encode()
+
+
+def response(status, content_type, body):
+    if isinstance(body, str):
+        body = body.encode()
+
+    return ("bytes", status, content_type, body)
 
 
 def json_response(data, status=200):
@@ -44,14 +59,32 @@ def json_response(data, status=200):
 
 def file_response(path, content_type):
     try:
-        with open(path, "rb") as file:
-            return response(200, content_type, file.read())
+        return ("file", 200, content_type, path, os.stat(path)[6])
     except OSError:
         return response(
             500,
             "text/plain; charset=utf-8",
             "Missing {}. Upload it next to main.py.".format(path),
         )
+
+
+def memory_free():
+    return gc.mem_free() if hasattr(gc, "mem_free") else None
+
+
+def memory_allocated():
+    return gc.mem_alloc() if hasattr(gc, "mem_alloc") else None
+
+
+def memory_state():
+    return {
+        "free": memory_free(),
+        "allocated": memory_allocated(),
+    }
+
+
+def is_connection_error(exc):
+    return isinstance(exc, OSError) and exc.args and exc.args[0] in CONNECTION_ERROR_CODES
 
 
 def zone_error_or_controller(zone_name, require_enabled=True):
@@ -159,6 +192,16 @@ def route(method, target, body=b""):
     if path == "/api/zones":
         return json_response(all_zones_state())
 
+    if path == "/api/system":
+        gc.collect()
+        return json_response({
+            "memory": memory_state(),
+            "gc": {
+                "file_chunk_bytes": FILE_CHUNK_BYTES,
+                "maintenance_seconds": GC_MAINTENANCE_SECONDS,
+            },
+        })
+
     parts = path.strip("/").split("/")
     if len(parts) == 4 and parts[0] == "api" and parts[1] == "zones":
         return handle_zone_action(method, parts[2], parts[3], query, body)
@@ -166,11 +209,46 @@ def route(method, target, body=b""):
     return json_response({"error": "Not found"}, 404)
 
 
+async def send_response(writer, payload):
+    response_type = payload[0]
+
+    if response_type == "file":
+        _, status, content_type, path, content_length = payload
+        gc.collect()
+        writer.write(response_headers(status, content_type, content_length))
+        await writer.drain()
+
+        with open(path, "rb") as file:
+            while True:
+                chunk = file.read(FILE_CHUNK_BYTES)
+                if not chunk:
+                    break
+                writer.write(chunk)
+                await writer.drain()
+        return
+
+    _, status, content_type, body = payload
+    writer.write(response_headers(status, content_type, len(body)))
+    writer.write(body)
+    await writer.drain()
+
+
+async def send_static_error(writer, status, body):
+    try:
+        writer.write(response_headers(status, "application/json", len(body)))
+        writer.write(body)
+        await writer.drain()
+    except OSError as exc:
+        if not is_connection_error(exc):
+            print("HTTP error response failed:", exc)
+    except Exception as exc:
+        print("HTTP error response failed:", exc)
+
+
 async def handle_client(reader, writer):
     try:
         request_line = await reader.readline()
         if not request_line:
-            await close_writer(writer)
             return
 
         parts = request_line.decode().strip().split()
@@ -201,27 +279,47 @@ async def handle_client(reader, writer):
             else:
                 payload = route(parts[0], parts[1], body)
 
-        writer.write(payload)
-        await writer.drain()
+        await send_response(writer, payload)
+    except OSError as exc:
+        if not is_connection_error(exc):
+            print("HTTP socket error:", exc)
+            await send_static_error(writer, 500, INTERNAL_ERROR_BODY)
+    except MemoryError as exc:
+        gc.collect()
+        print("HTTP memory error:", exc, "free:", memory_free(), "allocated:", memory_allocated())
+        await send_static_error(writer, 500, MEMORY_ERROR_BODY)
     except Exception as exc:
         print("HTTP error:", exc)
-        writer.write(json_response({"error": "Internal server error"}, 500))
-        await writer.drain()
+        await send_static_error(writer, 500, INTERNAL_ERROR_BODY)
     finally:
         await close_writer(writer)
+        gc.collect()
 
 
 async def close_writer(writer):
-    if hasattr(writer, "aclose"):
-        await writer.aclose()
-        return
+    try:
+        if hasattr(writer, "aclose"):
+            await writer.aclose()
+            return
 
-    writer.close()
-    if hasattr(writer, "wait_closed"):
-        await writer.wait_closed()
+        writer.close()
+        if hasattr(writer, "wait_closed"):
+            await writer.wait_closed()
+    except OSError as exc:
+        if not is_connection_error(exc):
+            print("HTTP close failed:", exc)
+    except Exception as exc:
+        print("HTTP close failed:", exc)
+
+
+async def gc_maintenance_loop():
+    while True:
+        await asyncio.sleep(GC_MAINTENANCE_SECONDS)
+        gc.collect()
 
 
 async def start_http_server(wlan):
+    asyncio.create_task(gc_maintenance_loop())
     await asyncio.start_server(handle_client, HTTP_HOST, HTTP_PORT)
     print("HTTP server listening on http://{}:{}/".format(wlan.ifconfig()[0], HTTP_PORT))
 

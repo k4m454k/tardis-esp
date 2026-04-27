@@ -132,7 +132,7 @@ The UI supports:
 
 ## API Overview
 
-The API is zone-only. Use `/api/zones/{zone}/...`, where `{zone}` is one of:
+The LED control API is zone-only. Use `/api/zones/{zone}/...`, where `{zone}` is one of:
 
 - `lamp`
 - `windows`
@@ -142,6 +142,12 @@ Read all zones:
 
 ```sh
 curl http://tardis-esp.local/api/zones
+```
+
+Read system memory diagnostics:
+
+```sh
+curl http://tardis-esp.local/api/system
 ```
 
 Read one zone:

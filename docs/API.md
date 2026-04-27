@@ -14,7 +14,7 @@ If `.local` is not available, use the IP printed in the serial console:
 HTTP server listening on http://<ip>:80/
 ```
 
-The public API is zone-only. The configured zones are `lamp`, `windows`, and `signs`.
+Light control endpoints are zone-only. The configured zones are `lamp`, `windows`, and `signs`.
 
 ## Zones
 
@@ -82,6 +82,21 @@ with HTTP `400`.
 
 `GET /api/zones/{zone}/state` returns one zone object.
 
+`GET /api/system` returns a compact diagnostic snapshot with heap memory and HTTP maintenance settings:
+
+```json
+{
+  "memory": {
+    "free": 65432,
+    "allocated": 12345
+  },
+  "gc": {
+    "file_chunk_bytes": 1024,
+    "maintenance_seconds": 60
+  }
+}
+```
+
 Zone fields:
 
 | Field | Type | Description |
@@ -135,6 +150,16 @@ Example:
 
 ```sh
 curl http://tardis-esp.local/api/zones
+```
+
+### `GET /api/system`
+
+Runs a garbage collection pass and returns heap diagnostics. Useful when checking whether the web UI is failing because free memory is low or fragmented after long uptime.
+
+Example:
+
+```sh
+curl http://tardis-esp.local/api/system
 ```
 
 ### `GET /api/zones/{zone}/state`
